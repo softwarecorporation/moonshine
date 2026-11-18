@@ -967,8 +967,8 @@ working copy, run:
 
 ```bash
 gh repo clone undivisible/undivisible /Users/undivisible/projects/undivisible
-gh repo clone tschk/tsc.hk /Users/undivisible/projects/tsc.hk
-gh repo clone tschk/.github /Users/undivisible/projects/tschk.github
+gh repo clone softwarecorporation/tsc.hk /Users/undivisible/projects/tsc.hk
+gh repo clone softwarecorporation/.github /Users/undivisible/projects/tschk.github
 ```
 
 - [ ] **Step 2: Inspect each repository instructions and existing README**

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Idempotent Cloud Agent / local bootstrap for tschk/moonshine.
+# Idempotent Cloud Agent / local bootstrap for softwarecorporation/moonshine.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"

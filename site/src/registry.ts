@@ -7,7 +7,7 @@ import { PACKAGES } from "./packages";
  * so, rather than falling back to a version number baked into the bundle.
  */
 
-const UA = "moonshine.tsc.hk (+https://github.com/tschk/moonshine)";
+const UA = "moonshine.tsc.hk (+https://github.com/softwarecorporation/moonshine)";
 
 const REGISTRY_TIMEOUT_MS = 2500;
 

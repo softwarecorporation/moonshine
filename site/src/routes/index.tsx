@@ -448,7 +448,7 @@ $ moonshine preview`}</code>
           ISR or image optimisation would not port this cleanly. The site also
           lost Next&rsquo;s client router, so in-app navigation is a full page
           load. Full caveats live in{" "}
-          <a href="https://github.com/tschk/moonshine/blob/main/docs/COMPARE.md">
+          <a href="https://github.com/softwarecorporation/moonshine/blob/main/docs/COMPARE.md">
             docs/COMPARE.md
           </a>
           .

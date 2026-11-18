@@ -21,7 +21,7 @@ const TAIL: NavItem[] = [
   { href: "/changelog", label: "changelog" },
   { href: "/api/state", label: "api" },
   {
-    href: "https://github.com/tschk/moonshine",
+    href: "https://github.com/softwarecorporation/moonshine",
     label: "github",
     external: true,
   },

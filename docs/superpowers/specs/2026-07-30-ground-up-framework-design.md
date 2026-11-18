@@ -313,8 +313,8 @@ Moonshine documentation will describe one identity consistently:
 compiler or metaframework capabilities. Comparisons will distinguish optional
 capability from default weight and will avoid unverified performance claims.
 
-The public READMEs for `undivisible/undivisible`, `tschk/tsc.hk`, and
-`tschk/.github` will adopt the same concise description and link to canonical
+The public READMEs for `undivisible/undivisible`, `softwarecorporation/tsc.hk`, and
+`softwarecorporation/.github` will adopt the same concise description and link to canonical
 Moonshine documentation without duplicating implementation details.
 
 ## Delivery Sequence

@@ -6,7 +6,7 @@
   },
   "install": "chmod +x scripts/cloud-agent-install.sh && ./scripts/cloud-agent-install.sh",
   "repositoryDependencies": [
-    "github.com/tschk/crepuscularity"
+    "github.com/softwarecorporation/crepuscularity"
   ],
   "agentCanUpdateSnapshot": true
 }
