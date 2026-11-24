@@ -248,6 +248,18 @@ async function buildBundledFunction(
   manifest: MoonshineManifest,
   outDir: string,
 ) {
+  const notFound = manifest.routes.find(
+    (route) => route.path === "/404" && route.mode !== "api",
+  );
+  if (notFound) {
+    const crossRuntime = manifest.routes.find(
+      (route) => route.mode !== "api" && route.runtime !== notFound.runtime,
+    );
+    if (crossRuntime)
+      throw new Error(
+        `Vercel /404 and page "${crossRuntime.path}" must use the same runtime; cross-runtime 404 fallbacks are not supported`,
+      );
+  }
   const output = resolve(outDir, ".vercel/output");
   const funcDir = resolve(output, "functions/moonshine.func");
   const staticDir = resolve(output, "static");
@@ -332,7 +344,13 @@ export default createNodeHandler({ fetch });
         routes: [
           { handle: "filesystem" },
           ...(edge ? dispatchRoutes(manifest.routes) : []),
-          { src: "/.*", dest: "/moonshine" },
+          {
+            src: "/.*",
+            dest:
+              notFound?.runtime === "vercel-edge"
+                ? "/moonshine-edge"
+                : "/moonshine",
+          },
         ],
         ...(Object.keys(overrides).length && { overrides }),
       },

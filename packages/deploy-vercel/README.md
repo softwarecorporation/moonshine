@@ -25,6 +25,11 @@ included route modules must initialize without Node-only APIs. Move Node-only
 work into Node route handlers or loaders; top-level Node-specific work can break
 Edge startup even when that route is dispatched to Node.
 
+For compiler builds with a custom `/404` page, every page route must use that
+page's runtime. Unmatched requests dispatch to that runtime too. Cross-runtime
+page-level 404 fallbacks are rejected at build time; API routes may still use
+the other runtime because their 404 responses do not render the custom page.
+
 See [docs/DEPLOYMENT.md](../../docs/DEPLOYMENT.md) and
 [docs/MANIFEST.md](../../docs/MANIFEST.md).
 

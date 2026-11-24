@@ -175,6 +175,9 @@ command to `moonshine build`.
   - Mixed Node/Edge builds share the server module graph; all included modules
     must initialize without Node-only APIs. Keep Node-only work inside Node
     handlers or loaders, not at module scope.
+  - A custom `/404` page must share its runtime with every page route. Unmatched
+    requests dispatch to that runtime; cross-runtime page fallbacks fail the
+    build. API routes can use the other runtime without custom-page fallback.
   - Static routes with params are rendered by the function on request.
   - `revalidation` is not a supported capability; routes that request it fail
     the build.
