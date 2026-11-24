@@ -56,7 +56,7 @@ function routeToRegex(path: string): string {
                 .padStart(2, "0")
                 .replace(/[a-f]/g, (hex) => `[${hex}${hex.toUpperCase()}]`),
           ).join("");
-          return `(?:${literal}|${encoded})`;
+          return char === "%" ? encoded : `(?:${literal}|${encoded})`;
         }).join("")
       );
     })

@@ -236,6 +236,14 @@ export function artifactConformance(
               ),
               route("notLiteral", "/releaseXjson", "edge.tsx", "ssr"),
               route(
+                "percent",
+                "/offers/offer%20sale",
+                "edge.tsx",
+                "ssr",
+                ', runtime: "vercel-edge"',
+              ),
+              route("decodedPercent", "/offers/:slug", "edge.tsx", "ssr"),
+              route(
                 "optionalPrefix",
                 "/:lang?/guide",
                 "edge.tsx",
@@ -334,8 +342,18 @@ export function artifactConformance(
       });
       expect(response.status).toBe(200);
       const reader = response.body!.getReader();
-      const first = await reader.read();
-      expect(new TextDecoder().decode(first.value)).toBe("first");
+      let first = "";
+      try {
+        while (first.length < "first".length) {
+          const chunk = await reader.read();
+          expect(chunk.done).toBe(false);
+          first += new TextDecoder().decode(chunk.value);
+        }
+        expect(first).toBe("first");
+      } finally {
+        const release = await fetch(url("/api/stream"), { method: "POST" });
+        expect(release.status).toBe(204);
+      }
       let rest = "";
       while (true) {
         const chunk = await reader.read();
@@ -399,6 +417,7 @@ export function artifactConformance(
           "/acme/manual/a/b",
           "/release.json",
           "/release%2Ejson",
+          "/offers/offer%2520sale",
           "/en/guide",
         ]) {
           const res = await fetch(url(path));
@@ -414,6 +433,7 @@ export function artifactConformance(
           "/edge/files/%2F",
           "/edge/files/%00",
           "/releaseXjson",
+          "/offers/offer%20sale",
           "/guide",
         ]) {
           const res = await fetch(url(path));
