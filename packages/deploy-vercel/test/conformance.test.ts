@@ -15,7 +15,11 @@ import {
   type MoonshineManifest,
   type RouteArtifact,
 } from "@tschk/moonshine-framework";
-import { adapterConformance } from "@tschk/moonshine-adapter-conformance";
+import {
+  adapterConformance,
+  artifactConformance,
+  vercelRuntime,
+} from "@tschk/moonshine-adapter-conformance";
 import { vercelAdapter, vercelHarness } from "../src/index.js";
 
 const pageFile = resolve(
@@ -25,6 +29,11 @@ const pageFile = resolve(
 
 describe("vercel adapter", () => {
   adapterConformance(vercelAdapter, vercelHarness);
+  artifactConformance(
+    vercelAdapter,
+    vercelRuntime,
+    resolve(import.meta.dir, ".."),
+  );
 
   test("rejects bun runtime", async () => {
     const buildDir = mkdtempSync(resolve(tmpdir(), "ms-vc-reject-"));

@@ -13,8 +13,17 @@ await vercelAdapter.build(manifest, ".moonshine");
 - Output: `.vercel/output` with static HTML, function directories, and
   `config.json` route regexes.
 
-Limitations: static catch-all routes are not pre-rendered; each non-static
-route becomes a separate function; `revalidation` is not supported.
+React compiler builds emit one standalone Node 22 function and, when requested,
+one Edge function. Both include the route modules and renderer from the server
+bundle. Filesystem routing serves public assets and prerendered HTML first;
+remaining requests dispatch in application route precedence to Node or Edge.
+Legacy explicit manifests emit separate functions per non-static route.
+
+Limitations: static catch-all routes are not pre-rendered; `revalidation` is
+not supported. Mixed Node/Edge builds share the server module graph, so all
+included route modules must initialize without Node-only APIs. Move Node-only
+work into Node route handlers or loaders; top-level Node-specific work can break
+Edge startup even when that route is dispatched to Node.
 
 See [docs/DEPLOYMENT.md](../../docs/DEPLOYMENT.md) and
 [docs/MANIFEST.md](../../docs/MANIFEST.md).

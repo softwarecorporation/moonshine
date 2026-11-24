@@ -402,6 +402,12 @@ async function runBuild(
       root,
       target,
       format: "esm",
+      // Link server API classes once in the final deploy bundle. Inlining them
+      // here gives loaders a different Redirect class than the request pipeline.
+      external:
+        target === "browser"
+          ? []
+          : ["@tschk/moonshine-server", "@tschk/moonshine-server/*"],
       naming: "[name].[ext]",
       splitting: options.splitting ?? false,
       sourcemap: "none",

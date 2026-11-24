@@ -156,19 +156,25 @@ and [Purge Everything instructions](https://developers.cloudflare.com/cache/how-
 Vercel reads it; set the Vercel project's framework to "Other" and its build
 command to `moonshine build`.
 
-- Target: the `node` runtime (the default for `--adapter vercel`).
+- Target: `node` (the default for `--adapter vercel`), with optional
+  `vercel-edge` routes in React builds.
 - Capabilities: `streaming`, `islands`, `edge`.
 - Output:
   - `.vercel/output/functions/moonshine.func/`: one Node function bundled
     from the server bundle, with every package inlined, so it runs without
-    the project's sources or `node_modules`. It serves every route the
-    filesystem does not.
+    the project's sources or `node_modules`.
+  - `.vercel/output/functions/moonshine-edge.func/`: an optional standalone
+    Edge function for React routes marked `runtime: "vercel-edge"`.
   - `.vercel/output/static/`: public assets, the client bundle and CSS, and
     React `static` routes without params, prerendered through the same
     bundle (`about.html` is served at `/about` through `overrides`).
-  - `.vercel/output/config.json`: `filesystem` first, then the function.
+  - `.vercel/output/config.json`: `filesystem` first, then Node/Edge rules in
+    application route precedence, then the Node function fallback.
 - Limitations:
-  - React builds with a server bundle reject `vercel-edge` routes.
+  - Native builds support Node only; native Edge routes are rejected.
+  - Mixed Node/Edge builds share the server module graph; all included modules
+    must initialize without Node-only APIs. Keep Node-only work inside Node
+    handlers or loaders, not at module scope.
   - Static routes with params are rendered by the function on request.
   - `revalidation` is not a supported capability; routes that request it fail
     the build.

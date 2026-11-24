@@ -2,6 +2,7 @@ import { copyFile, mkdir, realpath, rm, writeFile } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { existsSync } from "node:fs";
+import { createRouteGraph } from "@tschk/moonshine-router/graph";
 import {
   createRequestHandler,
   tryServeStatic,
@@ -33,11 +34,72 @@ type VercelConfig = {
 };
 
 function routeToRegex(path: string): string {
-  return `^${path
-    .replace(/\//g, "\\/")
-    .replace(/\*/g, ".*")
-    .replace(/:([^/]+?)\?/g, "(?<$1>[^/]*)")
-    .replace(/:([^/]+)/g, "(?<$1>[^/]+)")}$`;
+  const pattern = path
+    .split("/")
+    .filter(Boolean)
+    .map((part) => {
+      // Rest segments reject encoded separators and NUL, unlike parameters.
+      if (part.startsWith("*")) return "(?:/+(?![^/]*%(?:2[fF]|00))[^/]+)*";
+      if (part.startsWith(":"))
+        return part.endsWith("?") ? "(?:/+[^/]+)?" : "/+[^/]+";
+      // The router decodes each segment before comparing it with a literal.
+      return (
+        "/+" +
+        Array.from(part, (char) => {
+          const literal = char.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+          const encoded = Array.from(
+            new TextEncoder().encode(char),
+            (byte) =>
+              "%" +
+              byte
+                .toString(16)
+                .padStart(2, "0")
+                .replace(/[a-f]/g, (hex) => `[${hex}${hex.toUpperCase()}]`),
+          ).join("");
+          return `(?:${literal}|${encoded})`;
+        }).join("")
+      );
+    })
+    .join("");
+  return `^${pattern}/*$`;
+}
+
+/** Emit first-match platform rules in the application's route precedence. */
+function dispatchRoutes(routes: MoonshineManifest["routes"]): VercelRoute[] {
+  const candidates = createRouteGraph(routes).routes.flatMap(
+    ({ route, compiled }) => {
+      let variants: { path: string; score: number[] }[] = [
+        { path: "", score: [] },
+      ];
+      for (const [index, segment] of compiled.segments.entries()) {
+        variants = variants.flatMap(({ path, score }) => {
+          const included = {
+            path: `${path}/${segment.kind === "optional" || segment.kind === "dynamic" ? `:${segment.name}` : segment.value}`,
+            score: [...score, compiled.precedence[index]!],
+          };
+          // A skipped optional segment scores 0 rather than 1 in the router.
+          return segment.kind === "optional"
+            ? [included, { path, score: [...score, 0] }]
+            : [included];
+        });
+      }
+      return variants.map(({ path, score }) => ({
+        src: routeToRegex(path),
+        dest:
+          route.runtime === "vercel-edge" ? "/moonshine-edge" : "/moonshine",
+        score,
+      }));
+    },
+  );
+  // A missing segment scores 4, ahead of static (3), parameter (2) and splat (0).
+  candidates.sort((a, b) => {
+    for (let i = 0; i < Math.max(a.score.length, b.score.length); i++) {
+      const difference = (b.score[i] ?? 4) - (a.score[i] ?? 4);
+      if (difference) return difference;
+    }
+    return 0;
+  });
+  return candidates.map(({ src, dest }) => ({ src, dest }));
 }
 
 function staticSlug(path: string, usedSlugs: Set<string>): string {
@@ -176,7 +238,7 @@ async function copyPublicAssets(
 }
 
 /**
- * Writes `outDir/.vercel/output` around one Node function bundled from the
+ * Writes `outDir/.vercel/output` around Node and optional Edge functions from the
  * server bundle `moonshine build` emitted: its route modules and renderer,
  * with every package inlined, so the function runs on Vercel without the
  * project's sources or node_modules. React static routes are prerendered
@@ -197,13 +259,14 @@ async function buildBundledFunction(
   );
   await copyPublicAssets(manifest, outDir, staticDir);
   const entryPath = resolve(outDir, "vercel-native.ts");
-  await writeFile(
-    entryPath,
-    `import { createRequestHandler } from "@tschk/moonshine-server";
-import { createNodeHandler } from ${JSON.stringify(fileURLToPath(import.meta.resolve("@tschk/moonshine-deploy-node")))};
+  const appEntry = `import { createRequestHandler } from "@tschk/moonshine-server";
 import { modules, renderer } from ${JSON.stringify(`./${manifest.entries.server}`)};
 import manifest from "./manifest.json" with { type: "json" };
 const fetch = createRequestHandler({ manifest, modules, renderer });
+`;
+  await writeFile(
+    entryPath,
+    `${appEntry}import { createNodeHandler } from ${JSON.stringify(fileURLToPath(import.meta.resolve("@tschk/moonshine-deploy-node")))};
 export default createNodeHandler({ fetch });
 `,
   );
@@ -220,10 +283,7 @@ export default createNodeHandler({ fetch });
     define: { "process.env.NODE_ENV": '"production"' },
   });
   if (!result.success)
-    throw new AggregateError(
-      result.logs,
-      "Native Vercel Node function bundle failed",
-    );
+    throw new AggregateError(result.logs, "Vercel Node function bundle failed");
   await writeFile(
     resolve(funcDir, ".vc-config.json"),
     JSON.stringify(
@@ -237,12 +297,43 @@ export default createNodeHandler({ fetch });
       2,
     ) + "\n",
   );
+  const edge = manifest.routes.some((route) => route.runtime === "vercel-edge");
+  if (edge) {
+    const edgeDir = resolve(output, "functions/moonshine-edge.func");
+    const edgeEntry = resolve(outDir, "vercel-edge.ts");
+    await writeFile(
+      edgeEntry,
+      `${appEntry}export default (request) => fetch(request);\n`,
+    );
+    const edgeResult = await Bun.build({
+      entrypoints: [edgeEntry],
+      outdir: edgeDir,
+      naming: "index.js",
+      target: "browser",
+      packages: "bundle",
+      define: { "process.env.NODE_ENV": '"production"' },
+    });
+    if (!edgeResult.success)
+      throw new AggregateError(
+        edgeResult.logs,
+        "Vercel Edge function bundle failed",
+      );
+    await writeFile(
+      resolve(edgeDir, ".vc-config.json"),
+      JSON.stringify({ runtime: "edge", entrypoint: "index.js" }, null, 2) +
+        "\n",
+    );
+  }
   await writeFile(
     resolve(output, "config.json"),
     JSON.stringify(
       {
         version: 3,
-        routes: [{ handle: "filesystem" }, { src: "/.*", dest: "/moonshine" }],
+        routes: [
+          { handle: "filesystem" },
+          ...(edge ? dispatchRoutes(manifest.routes) : []),
+          { src: "/.*", dest: "/moonshine" },
+        ],
         ...(Object.keys(overrides).length && { overrides }),
       },
       null,
@@ -336,10 +427,6 @@ export const vercelAdapter: DeploymentAdapter = {
       return;
     }
     if (hasServerBundle(manifest, outDir)) {
-      if (manifest.routes.some((route) => route.runtime === "vercel-edge"))
-        throw new Error(
-          "React Vercel output runs one Node function; vercel-edge routes are not supported",
-        );
       await buildBundledFunction(manifest, outDir);
       return;
     }
