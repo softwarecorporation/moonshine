@@ -7,7 +7,11 @@ import {
   type MoonshineManifest,
   type RouteArtifact,
 } from "@tschk/moonshine-framework";
-import { adapterConformance } from "@tschk/moonshine-adapter-conformance";
+import {
+  adapterConformance,
+  artifactConformance,
+  workerdRuntime,
+} from "@tschk/moonshine-adapter-conformance";
 import {
   cloudflareAdapter,
   cloudflareFetch,
@@ -30,6 +34,11 @@ const baseManifest: MoonshineManifest = {
 
 describe("cloudflare adapter", () => {
   adapterConformance(cloudflareAdapter, cloudflareHarness);
+  artifactConformance(
+    cloudflareAdapter,
+    workerdRuntime,
+    resolve(import.meta.dir, ".."),
+  );
 
   test("rejects node routes", async () => {
     const buildDir = mkdtempSync(resolve(tmpdir(), "ms-cf-reject-"));
