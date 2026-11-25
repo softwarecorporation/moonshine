@@ -34,14 +34,29 @@ type VercelConfig = {
 };
 
 function routeToRegex(path: string): string {
+  // decodeURIComponent rejects malformed escapes, overlong UTF-8 and surrogates.
+  const continuation = "%[89aAbB][0-9a-fA-F]";
+  const encoded = [
+    "%[0-7][0-9a-fA-F]",
+    `%(?:[cC][2-9a-fA-F]|[dD][0-9a-fA-F])${continuation}`,
+    `%[eE]0%[aAbB][0-9a-fA-F]${continuation}`,
+    `%[eE][1-9a-cA-C]${continuation}${continuation}`,
+    `%[eE][dD]%[89][0-9a-fA-F]${continuation}`,
+    `%[eE][eEfF]${continuation}${continuation}`,
+    `%[fF]0%[9aAbB][0-9a-fA-F]${continuation}${continuation}`,
+    `%[fF][1-3]${continuation}${continuation}${continuation}`,
+    `%[fF]4%8[0-9a-fA-F]${continuation}${continuation}`,
+  ].join("|");
+  const segment = `(?:[^/%]|${encoded})+`;
   const pattern = path
     .split("/")
     .filter(Boolean)
     .map((part) => {
       // Rest segments reject encoded separators and NUL, unlike parameters.
-      if (part.startsWith("*")) return "(?:/+(?![^/]*%(?:2[fF]|00))[^/]+)*";
+      if (part.startsWith("*"))
+        return `(?:/+(?![^/]*%(?:2[fF]|00))${segment})*`;
       if (part.startsWith(":"))
-        return part.endsWith("?") ? "(?:/+[^/]+)?" : "/+[^/]+";
+        return part.endsWith("?") ? `(?:/+${segment})?` : `/+${segment}`;
       // The router decodes each segment before comparing it with a literal.
       return (
         "/+" +

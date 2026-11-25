@@ -35,6 +35,13 @@ export const loader = () => { throw new Response(null, { status: 404 }); };
         join(project, "pages/api404.ts"),
         `export const GET = () => new Response(null, { status: 404 });\n`,
       );
+      await Bun.write(
+        join(project, "pages/parameter.ts"),
+        `export const loader = ({ params }: { params: Record<string, string> }) => Response.json({
+  id: params.id,
+  runtime: typeof process !== "undefined" && process.versions?.node ? "node" : "vercel-edge",
+});\n`,
+      );
       const other = runtime === "node" ? "vercel-edge" : "node";
       const config = {
         runtime,
@@ -60,6 +67,13 @@ export const loader = () => { throw new Response(null, { status: 404 }); };
             mode: "api",
             runtime: other,
           },
+          ...["/api/:id", "/optional/:id?", "/rest/*id"].map((path, index) => ({
+            id: `parameter${index}`,
+            path,
+            file: "pages/parameter.ts",
+            mode: "api",
+            runtime: other,
+          })),
         ],
       };
       const build = async () => {
@@ -128,6 +142,49 @@ export const loader = () => { throw new Response(null, { status: 404 }); };
       const api = await fetch(new URL("/api404", app.url));
       expect(api.status).toBe(404);
       expect(await api.text()).toBe("");
+      for (const prefix of ["/api/", "/optional/", "/rest/"]) {
+        for (const value of [
+          "%ZZ",
+          "%",
+          "%2",
+          "%80",
+          "%C0%AF",
+          "%C2",
+          "%E0%80%80",
+          "%ED%A0%80",
+          "%EF%BF",
+          "%F0%80%80%80",
+          "%F4%90%80%80",
+          "%F5%80%80%80",
+        ]) {
+          const response = await fetch(new URL(prefix + value, app.url));
+          expect(response.status, prefix + value).toBe(404);
+          expect(await response.text(), prefix + value).toContain(
+            `<p>${marker}</p>`,
+          );
+        }
+        for (const value of [
+          "plain",
+          "%25ZZ",
+          "%20",
+          "%7F",
+          "%C2%80",
+          "%DF%BF",
+          "%E0%A0%80",
+          "%ED%9F%BF",
+          "%EF%BF%BF",
+          "%F0%90%80%80",
+          "%F4%8F%BF%BF",
+          ...(prefix === "/rest/" ? [] : ["%00", "%2f"]),
+        ]) {
+          const response = await fetch(new URL(prefix + value, app.url));
+          expect(response.status, prefix + value).toBe(200);
+          expect(await response.json()).toEqual({
+            id: decodeURIComponent(value),
+            runtime: other,
+          });
+        }
+      }
     } finally {
       await app?.stop();
       await rm(work, { recursive: true, force: true });
